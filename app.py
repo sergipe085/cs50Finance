@@ -50,14 +50,15 @@ def index():
 
     stocks = db.execute("SELECT * FROM stocks WHERE userid = ?", session["user_id"])
     total = 0
+    currentBalance = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])[0]["cash"]
 
     for stock in stocks:
         symbol = lookup(stock["symbol"])
         price = lookup(stock["symbol"])["price"]
-        stock["price"] = price
-        stock["total"] = price * stock["shares"]
+        stock["price"] = usd(price)
+        stock["total"] = usd(price * stock["shares"])
         total += price * stock["shares"]
-    return render_template("index.html", stocks=stocks, total=total)
+    return render_template("index.html", stocks=stocks, total=usd(total+currentBalance), current=usd(currentBalance))
 
 
 @app.route("/buy", methods=["GET", "POST"])
