@@ -47,7 +47,17 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    return apology("TODO")
+
+    stocks = db.execute("SELECT * FROM stocks WHERE userid = ?", session["user_id"])
+    total = 0
+
+    for stock in stocks:
+        symbol = lookup(stock["symbol"])
+        price = lookup(stock["symbol"])["price"]
+        stock["price"] = price
+        stock["total"] = price * stock["shares"]
+        total += price * stock["shares"]
+    return render_template("index.html", stocks=stocks, total=total)
 
 
 @app.route("/buy", methods=["GET", "POST"])
@@ -60,8 +70,9 @@ def buy():
     if request.method == "GET":
         return render_template("buy.html")
 
-    symbol = request.form.get("symbol")
+    symbol = lookup(request.form.get("symbol"))["symbol"]
     lookupRes = lookup(symbol)
+    print("qeeeejo")
 
     shares = request.form.get("shares")
 
@@ -74,8 +85,10 @@ def buy():
     if int(shares) <= 0:
         return apology("Please provide a positive/ number")
 
-    price = int(shares) * lookupRes["price"]
+    sharePrice = lookupRes["price"]
+    price = int(shares) * sharePrice
     newCash = currentCash - price
+    name = lookupRes["name"]
 
     if (newCash < 0):
         return apology("You dont have enough money")
@@ -84,10 +97,15 @@ def buy():
     now_string = now.strftime("%d/%m/%Y %H:%M:%S")
 
     db.execute("UPDATE users SET cash = ? WHERE id = ?", newCash, session["user_id"])
-    db.execute("INSERT INTO purchases(user, symbol, price, date) VALUES(?, ?, ?, ?)", session["user_id"], symbol, price, now_string)
+    db.execute("INSERT INTO purchases(user, symbol, name, price, shares, date) VALUES(?, ?, ?, ?, ?, ?)", session["user_id"], symbol, name, sharePrice, int(shares), now_string)
+    
+    if db.execute("SELECT * FROM stocks WHERE userid = ? AND symbol = ?", session["user_id"], symbol) == []:
+        db.execute("INSERT INTO stocks(symbol, name, userid, shares) VALUES (?, ?, ?, ?)", symbol, name, session["user_id"], int(shares))
+    else:
+        currentShares = db.execute("SELECT shares FROM stocks WHERE userid = ? AND symbol = ?", session["user_id"], symbol)[0]["shares"]
+        db.execute("UPDATE stocks SET shares = ? WHERE userid = ? AND symbol = ?", currentShares + int(shares), session["user_id"], symbol)    
 
-    return apology("TODO")
-
+    return redirect("/")
 
 @app.route("/history")
 @login_required
